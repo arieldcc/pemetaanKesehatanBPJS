@@ -31,7 +31,7 @@
                     <h4 class="card-title m-0">{{ $title }}</h4>
                 </div>
             </div>
-            <form method="POST" onsubmit="return false;">
+            <form method="POST">
                 <div class="form-row">
                     <div class="form-group col-md-6">
                         <label for="categoryFilter">Mengelompokkan Data berdasarkan Kategori</label>
@@ -44,10 +44,11 @@
                             </select>
                         </div>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group col-md-12">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Cari berdasarkan nama fasilitas atau layanan">
+                    <div class="form-group col-md-6">
+                        <label for="searchInput">Cari Lokasi dan Layanan</label>
+                        <div class="card-body">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Cari Lokasi">
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">
