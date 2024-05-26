@@ -99,4 +99,6 @@ Route::controller(LokasiController::class)->group(function(){
     Route::get('/data-lokasi','awal');
 });
 
+Route::any('/cari-lokasi', [LokasiController::class, 'cariLokasi'])->name('cariLokasi');
+
 Auth::routes();

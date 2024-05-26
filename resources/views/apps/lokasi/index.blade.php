@@ -3,7 +3,6 @@
 @section('css')
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <!-- Include MarkerCluster CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.4.1/MarkerCluster.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.4.1/MarkerCluster.Default.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.fullscreen/1.0.2/Control.FullScreen.min.css" />
@@ -22,16 +21,17 @@
         }
     </style>
 @endsection
+
 @section('content')
 <div class="row">
     <div class="col-md-12">
         <div class="card shadow mb-4">
             <div class="card-header py-2">
-                <div class="d-flex justify-content-between align-items-center"> <!-- Tambahkan flexbox untuk alignment -->
+                <div class="d-flex justify-content-between align-items-center">
                     <h4 class="card-title m-0">{{ $title }}</h4>
                 </div>
             </div>
-            <form method="POST">
+            <form method="POST" onsubmit="return false;">
                 <div class="form-row">
                     <div class="form-group col-md-6">
                         <label for="categoryFilter">Mengelompokkan Data berdasarkan Kategori</label>
@@ -45,14 +45,17 @@
                         </div>
                     </div>
                 </div>
-
-                    <div class="form-row">
-                        <div class="form-group col-md-12">
-                            <div id="map"></div>
-                        </div>
+                <div class="form-row">
+                    <div class="form-group col-md-12">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Cari berdasarkan nama fasilitas atau layanan">
                     </div>
-                </form>
-            </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-md-12">
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -61,7 +64,6 @@
 @section('js')
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <!-- Include MarkerCluster JavaScript -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.4.1/leaflet.markercluster.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.fullscreen/1.0.2/Control.FullScreen.min.js"></script>
 
@@ -86,11 +88,56 @@
             center: [0.553839, 123.049102],
             zoom: 12,
             layers: [osm]
-        })
+        });
 
-        var facilities = @json($fasilitas);
-        // var map = L.map('map').setView([0.553839, 123.049102], 12); //titik Gorontalo
         var baseUrl = "{{ asset('storage') }}/";
+        var markers = L.markerClusterGroup();
+
+        function addMarkers(facilities) {
+            markers.clearLayers();
+            facilities.forEach(function(facility) {
+                if(facility.latitude && facility.longitude) {
+                    var customIcon = L.icon({
+                        iconUrl: baseUrl + facility.kategori.icon,
+                        iconSize: [38, 38],
+                        popupAnchor: [0, -28]
+                    });
+
+                    var marker = L.marker([facility.latitude, facility.longitude], {icon: customIcon});
+                    marker.bindPopup(getPopupContent(facility));
+                    markers.addLayer(marker);
+                }
+            });
+            map.addLayer(markers);
+        }
+
+        function getPopupContent(facility) {
+            var content = '<table>' +
+                  '<tr><td colspan="2"><b>' + facility.nama_fasilitas + '</b></td></tr>' +
+                  '<tr><td colspan="2"><img src="'+baseUrl + facility.foto + '" style="width: 150px; height: 150px; object-fit: cover; margin-top: 0px;" class="card-img-top rounded-circle mx-auto d-block"></td></tr>' +
+                  '<tr><td>Alamat</td><td>: ' + facility.alamat + '</td></tr>'+
+                  '<tr><td>No. Telp.</td><td>: ' + facility.no_telp + '</td></tr>'+
+                  '<tr><td>E-Mail</td><td>: ' + facility.email + '</td></tr>';
+
+            facility.dokter.forEach(function(doctor) {
+                content += '<tr><td colspan="2"><h4>Dr. ' + doctor.nama_dokter + ' (' + doctor.spesialis + ')</h4></td></tr>' +
+                        '<tr><td colspan="2"><img src="'+baseUrl + doctor.foto + '" style="width: 150px; height: 150px; object-fit: cover; margin-top: 0px;" class="card-img-top rounded-circle mx-auto d-block"></td></tr>'+
+                        '<tr><td>No. Telp.</td><td>: ' + doctor.no_telp + '</td></tr>'+
+                  '<tr><td>E-Mail</td><td>: ' + doctor.email + '</td></tr>';
+                doctor.jadwal_dokter.forEach(function(schedule) {
+                    content += '<tr><td>' + schedule.hari + ':</td><td>' + schedule.jam_mulai + ' - ' + schedule.jam_selesai + '</td></tr>';
+                });
+            });
+
+            facility.layanan.forEach(function(service) {
+                content += '<tr><td>Layanan Kesehatan </td><td>: ' + service.nama_layanan + '</td></tr>'+
+                '<tr><td>Keterangan </td><td>: ' + service.keterangan + '</td></tr>';
+            });
+
+            content += '</table>';
+
+            return content;
+        }
 
         $(document).ready(function() {
             function formatCategory (category) {
@@ -107,86 +154,46 @@
                 templateResult: formatCategory
             });
 
-            $('#categoryFilter').on('select2:select', function(e) {
-                var selectedCategory = e.target.value;
-                // console.log(selectedCategory);
-                markers.clearLayers(); // Clear all markers
-                facilities.forEach(function(facility) {
-                    if(facility.latitude && facility.longitude && (facility.kategori.id == selectedCategory || selectedCategory === '')) {
-                        var customIcon = L.icon({
-                            iconUrl: baseUrl+facility.kategori.icon,
-                            iconSize: [38, 38], // size of the icon
-                            popupAnchor: [0, -28] // point from which the popup should open relative to the iconAnchor
-                        });
+            $('#searchInput').on('keypress', function(event) {
+                if (event.keyCode === 13) {
+                    event.preventDefault();
+                }
+            });
 
-                        var marker = L.marker([facility.latitude, facility.longitude], {icon: customIcon});
-                        marker.bindPopup(getPopupContent(facility));
-                        markers.addLayer(marker);
+            $('#categoryFilter, #searchInput').on('change keyup', function() {
+                var selectedCategory = $('#categoryFilter').val();
+                var searchQuery = $('#searchInput').val();
+
+                $.ajax({
+                    url: '{{ route("cariLokasi") }}',
+                    type: 'GET',
+                    data: {
+                        kategori_id: selectedCategory,
+                        search: searchQuery
+                    },
+                    success: function(data) {
+                        addMarkers(data);
                     }
                 });
-                map.addLayer(markers);
+            });
+
+            // Load initial markers
+            $.ajax({
+                url: '{{ route("cariLokasi") }}',
+                type: 'GET',
+                success: function(data) {
+                    addMarkers(data);
+                }
             });
         });
-
-        // L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-        //     maxZoom: 18
-        // }).addTo(map);
-
-        var markers = L.markerClusterGroup();
-
-        facilities.forEach(function(facility) {
-            if(facility.latitude && facility.longitude) {
-                var customIcon = L.icon({
-                    iconUrl: baseUrl+facility.kategori.icon,
-                    iconSize: [38, 38], // ukuran icon
-                    popupAnchor: [0, -28] // point from which the popup should open relative to the iconAnchor
-                });
-
-                var marker = L.marker([facility.latitude, facility.longitude], {icon: customIcon}).addTo(map);
-
-                marker.bindPopup(getPopupContent(facility));
-                markers.addLayer(marker);
-            }
-        });
-
-        map.addLayer(markers);
-
-        function getPopupContent(facility) {
-            var content = '<table>' +
-                  '<tr><td colspan="2"><b>' + facility.nama_fasilitas + '</b></td></tr>' +
-                  '<tr><td colspan="2"><img src="'+baseUrl + facility.foto + '" style="width: 150px; height: 150px; object-fit: cover; margin-top: 0px;" class="card-img-top rounded-circle mx-auto d-block"></td></tr>' +
-                  '<tr><td>Alamat</td><td>: ' + facility.alamat + '</td></tr>'+
-                  '<tr><td>No. Telp.</td><td>: ' + facility.no_telp + '</td></tr>'+
-                  '<tr><td>E-Mail</td><td>: ' + facility.email + '</td></tr>';
-
-            // Add doctors and their schedules to the popup content
-            facility.dokter.forEach(function(doctor) {
-                content += '<tr><td colspan="2"><h4>Dr. ' + doctor.nama_dokter + ' (' + doctor.spesialis + ')</h4></td></tr>' +
-                        '<tr><td colspan="2"><img src="'+baseUrl + doctor.foto + '" style="width: 150px; height: 150px; object-fit: cover; margin-top: 0px;" class="card-img-top rounded-circle mx-auto d-block"></td></tr>'+
-                        '<tr><td>No. Telp.</td><td>: ' + doctor.no_telp + '</td></tr>'+
-                  '<tr><td>E-Mail</td><td>: ' + doctor.email + '</td></tr>';
-                doctor.jadwal_dokter.forEach(function(schedule) {
-                    content += '<tr><td>' + schedule.hari + ':</td><td>' + schedule.jam_mulai + ' - ' + schedule.jam_selesai + '</td></tr>';
-                });
-            });
-
-            // Add services to the popup content
-            facility.layanan.forEach(function(service) {
-                content += '<tr><td>Layanan Kesehatan </td><td>: ' + service.nama_layanan + '</td></tr>'+
-                '<tr><td>Keterangan </td><td>: ' + service.keterangan + '</td></tr>';
-            });
-
-            content += '</table>';
-
-            return content;
-        }
 
         var baseMaps = {
             'Open Street Map': osm,
             'Esri World': Esri_WorldStreetMap,
             'Stadia Dark': Stadia_Dark
-        }
+        };
 
-        L.control.layers(baseMaps).addTo(map)
+        L.control.layers(baseMaps).addTo(map);
     </script>
 @endsection
+
